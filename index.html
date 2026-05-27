@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>018 · Rainbow Readers for Ana · AppADay</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --r: #FF5B8B; --o: #FF8C42; --y: #FFD23F;
+    --g: #43D68F; --b: #4BAEE8; --p: #9B6DFF;
+    --bg: #FFF9F0; --text: #2D2040; --card: #FFFFFF;
+    --shadow: rgba(155,109,255,0.18);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: var(--bg);
+    min-height: 100dvh;
+    display: flex; flex-direction: column; align-items: center;
+    overflow-x: hidden;
+  }
+  .rainbow-bar {
+    width: 100%; height: 10px;
+    background: linear-gradient(90deg, var(--r), var(--o), var(--y), var(--g), var(--b), var(--p));
+  }
+  .nav {
+    width: 100%; display: flex; align-items: center;
+    justify-content: space-between; padding: 10px 16px 6px; gap: 8px;
+  }
+  .nav-id  { font-size: 11px; font-weight: 700; color: var(--p); letter-spacing:.08em; opacity:.7; white-space:nowrap; }
+  .nav-home{ font-size: 11px; font-weight: 700; color: var(--b); text-decoration:none; opacity:.7; }
+  .nav-home:hover { opacity:1; }
+
+  .stars-row { display:flex; gap:6px; padding:4px 0 10px; }
+  .star { font-size:28px; filter:grayscale(1) opacity(.25); transition:filter .3s, transform .3s; }
+  .star.earned { filter:none; animation: starPop .4s cubic-bezier(.34,1.56,.64,1) both; }
+  @keyframes starPop { 0%{transform:scale(0)} 100%{transform:scale(1)} }
+
+  .score-bar { display:flex; gap:20px; font-size:14px; font-weight:700; color:#7A6BA0; padding-bottom:20px; }
+  .score-bar span { color:var(--p); font-size:18px; font-weight:900; }
+
+  .card {
+    background: var(--card); border-radius:28px;
+    box-shadow: 0 8px 32px var(--shadow);
+    width: min(92vw, 440px);
+    padding: 32px 24px 24px;
+    display:flex; flex-direction:column; align-items:center; gap:16px;
+    position:relative; margin-bottom: 24px;
+  }
+  .level-badge {
+    position:absolute; top:-14px;
+    background: linear-gradient(135deg, var(--p), var(--b));
+    color:#fff; font-size:12px; font-weight:900;
+    padding:4px 14px; border-radius:20px; letter-spacing:.06em;
+  }
+
+  /* ── emoji ── */
+  .emoji-display {
+    font-size: clamp(64px,18vw,90px); line-height:1; user-select:none;
+    animation: floatIn .5s cubic-bezier(.34,1.56,.64,1) both;
+    filter: drop-shadow(0 4px 12px rgba(0,0,0,.12));
+  }
+  @keyframes floatIn { 0%{opacity:0;transform:scale(.6) translateY(20px)} 100%{opacity:1;transform:scale(1) translateY(0)} }
+
+  /* ── prompt ── */
+  .prompt {
+    font-size: clamp(17px,4.5vw,21px); font-weight:900; color:var(--text);
+    text-align:center; line-height:1.35;
+  }
+  .prompt .hl {
+    display:inline-block;
+    background: linear-gradient(90deg,var(--r),var(--o),var(--y),var(--g),var(--b),var(--p));
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+    background-clip:text; font-size:clamp(26px,7vw,36px); letter-spacing:.12em;
+  }
+
+  /* ── choice buttons ── */
+  .choices { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; width:100%; }
+  .choice-btn {
+    background:var(--card); border:3.5px solid #E8E0FF; border-radius:18px;
+    padding:14px 6px; font-family:'Nunito',sans-serif;
+    font-size:clamp(18px,5.5vw,26px); font-weight:900; color:var(--text);
+    cursor:pointer; transition:transform .15s, border-color .15s, background .15s;
+    min-height:68px; display:flex; align-items:center; justify-content:center;
+    letter-spacing:.06em;
+  }
+  .choice-btn:active { transform:scale(.94); }
+  .choice-btn.correct { background:#EAFFF4; border-color:var(--g); animation:correctPop .5s cubic-bezier(.34,1.56,.64,1) both; }
+  .choice-btn.wrong   { background:#FFF0F3; border-color:var(--r); animation:shake .4s both; }
+  @keyframes correctPop { 0%{transform:scale(1)} 50%{transform:scale(1.1)} 100%{transform:scale(1)} }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
+
+  /* ── tracing area ── */
+  .trace-area { display:flex; flex-direction:column; align-items:center; gap:12px; width:100%; }
+  .trace-instruction { font-size:15px; font-weight:700; color:#9B8EC0; text-align:center; line-height:1.4; }
+
+  .canvas-wrap {
+    position:relative; border-radius:20px; overflow:hidden;
+    box-shadow: 0 4px 20px rgba(155,109,255,.2);
+    border: 3px solid #E8E0FF;
+    touch-action: none;
+  }
+  canvas { display:block; }
+
+  .trace-btns { display:flex; gap:10px; }
+  .clear-btn {
+    background:#F3F0FF; border:2.5px solid #D0C4FF; border-radius:14px;
+    padding:10px 22px; font-family:'Nunito',sans-serif; font-size:15px;
+    font-weight:900; color:var(--p); cursor:pointer; transition:background .15s;
+  }
+  .clear-btn:hover { background:#E8E0FF; }
+  .check-btn {
+    background: linear-gradient(135deg,var(--g),#2BC77A);
+    border:none; border-radius:14px; padding:10px 28px;
+    font-family:'Nunito',sans-serif; font-size:15px; font-weight:900;
+    color:#fff; cursor:pointer; box-shadow:0 3px 12px rgba(67,214,143,.35);
+    transition:transform .15s;
+  }
+  .check-btn:hover { transform:translateY(-1px); }
+
+  /* word tracing letter nav */
+  .letter-nav { display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:center; }
+  .letter-pip {
+    width:32px; height:32px; border-radius:50%; border:2.5px solid #D0C4FF;
+    display:flex; align-items:center; justify-content:center;
+    font-size:14px; font-weight:900; color:#9B8EC0;
+    transition:all .2s;
+  }
+  .letter-pip.done    { background:var(--g); border-color:var(--g); color:#fff; }
+  .letter-pip.current { background:var(--p); border-color:var(--p); color:#fff; transform:scale(1.15); }
+
+  /* ── feedback ── */
+  .feedback { font-size:clamp(20px,6vw,28px); font-weight:900; min-height:36px; text-align:center; transition:opacity .3s; }
+  .feedback.show-good { color:var(--g); animation:feedbackIn .4s both; }
+  .feedback.show-bad  { color:var(--r); animation:feedbackIn .4s both; }
+  @keyframes feedbackIn { 0%{opacity:0;transform:scale(.8)} 100%{opacity:1;transform:scale(1)} }
+
+  /* ── next / celebrate ── */
+  .next-btn {
+    display:none; background:linear-gradient(135deg,var(--p),var(--b));
+    color:#fff; border:none; border-radius:20px; padding:15px 38px;
+    font-family:'Nunito',sans-serif; font-size:19px; font-weight:900;
+    cursor:pointer; letter-spacing:.04em;
+    box-shadow:0 4px 16px rgba(75,174,232,.35); transition:transform .15s;
+  }
+  .next-btn:hover { transform:translateY(-2px); }
+  .next-btn.visible { display:block; animation:feedbackIn .3s .15s both; }
+
+  .celebrate { display:none; flex-direction:column; align-items:center; gap:16px; padding:20px 0 10px; text-align:center; }
+  .celebrate.visible { display:flex; }
+  .celebrate-emoji { font-size:72px; animation:floatIn .6s both; }
+  .celebrate-title { font-size:clamp(24px,7vw,32px); font-weight:900; color:var(--text); line-height:1.2; }
+  .celebrate-sub   { font-size:16px; font-weight:700; color:#7A6BA0; }
+  .play-again-btn {
+    background:linear-gradient(135deg,var(--r),var(--o)); color:#fff;
+    border:none; border-radius:20px; padding:15px 42px;
+    font-family:'Nunito',sans-serif; font-size:19px; font-weight:900;
+    cursor:pointer; margin-top:8px; box-shadow:0 4px 16px rgba(255,91,139,.35);
+    transition:transform .15s;
+  }
+  .play-again-btn:hover { transform:translateY(-2px); }
+
+  /* ── confetti ── */
+  .confetti-wrap { position:fixed; inset:0; pointer-events:none; overflow:hidden; z-index:100; }
+  .confetti-piece {
+    position:absolute; width:10px; height:10px; border-radius:2px;
+    animation:confettiFall linear forwards;
+  }
+  @keyframes confettiFall { 0%{transform:translateY(-20px) rotate(0deg);opacity:1} 100%{transform:translateY(110vh) rotate(720deg);opacity:0} }
+
+  /* bg decoration */
+  .bg-unicorn { position:fixed; font-size:32px; opacity:.08; pointer-events:none; animation:drift linear infinite; }
+  @keyframes drift { 0%{transform:translateY(0) rotate(-5deg)} 50%{transform:translateY(-18px) rotate(5deg)} 100%{transform:translateY(0) rotate(-5deg)} }
+</style>
+</head>
+<body>
+
+<div class="bg-unicorn" style="top:8%;left:5%;animation-duration:6s">🦄</div>
+<div class="bg-unicorn" style="top:22%;right:6%;animation-duration:8s;animation-delay:2s">🌈</div>
+<div class="bg-unicorn" style="top:55%;left:3%;animation-duration:7s;animation-delay:1s">⭐</div>
+<div class="bg-unicorn" style="top:70%;right:4%;animation-duration:9s;animation-delay:3s">🦄</div>
+
+<div class="rainbow-bar"></div>
+<nav class="nav">
+  <span class="nav-id">018 · Rainbow Readers · AppADay</span>
+  <a class="nav-home" href="https://augustineiacopelli.github.io">← Home</a>
+</nav>
+
+<div style="font-size:18px;font-weight:900;color:var(--p);padding:4px 0 2px;letter-spacing:.02em;">
+  🦄 Ana's Rainbow Readers 🌈
+</div>
+
+<div class="stars-row" id="starsRow"></div>
+<div class="score-bar">Score: <span id="scoreNum">0</span> &nbsp;|&nbsp; Round: <span id="roundNum">1</span> / <span id="roundTotal">8</span></div>
+
+<div class="card" id="mainCard">
+  <div class="level-badge" id="levelBadge">Level 1</div>
+
+  <div id="questionArea">
+    <div class="emoji-display" id="emojiDisplay"></div>
+    <div class="prompt"    id="promptText"></div>
+    <div class="choices"   id="choicesGrid"></div>
+
+    <!-- tracing area (hidden during tap levels) -->
+    <div class="trace-area" id="traceArea" style="display:none">
+      <div class="trace-instruction" id="traceInstruction"></div>
+      <div class="letter-nav" id="letterNav"></div>
+      <div class="canvas-wrap" id="canvasWrap">
+        <canvas id="guideCanvas"></canvas>
+        <canvas id="drawCanvas" style="position:absolute;top:0;left:0"></canvas>
+      </div>
+      <!-- offscreen hit-test canvas: fully opaque render for pixel comparison -->
+      <canvas id="hitCanvas" style="display:none"></canvas>
+      <div class="trace-btns">
+        <button class="clear-btn" onclick="clearDraw()">Clear ✏️</button>
+        <button class="check-btn" onclick="checkTrace()">Check ✓</button>
+      </div>
+    </div>
+
+    <div class="feedback" id="feedbackText"></div>
+    <button class="next-btn" id="nextBtn" onclick="nextQuestion()">Next ✨</button>
+  </div>
+
+  <div class="celebrate" id="celebrateScreen">
+    <div class="celebrate-emoji" id="celebrateEmoji">🌈</div>
+    <div class="celebrate-title" id="celebrateTitle"></div>
+    <div class="celebrate-sub"   id="celebrateSub"></div>
+    <button class="play-again-btn" onclick="restart()">Play Again 🦄</button>
+  </div>
+</div>
+
+<div class="confetti-wrap" id="confettiWrap"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  DATA
+// ═══════════════════════════════════════════════════════
+const QUESTIONS = [
+  { emoji:"🐱", word:"cat",  decoys:["bat","hat"],  wrongLetters:["b","h"] },
+  { emoji:"🐶", word:"dog",  decoys:["fog","log"],  wrongLetters:["f","l"] },
+  { emoji:"☀️",  word:"sun",  decoys:["bun","run"],  wrongLetters:["b","r"] },
+  { emoji:"🐸", word:"frog", decoys:["blog","log"], wrongLetters:["b","l"] },
+  { emoji:"🐝", word:"bee",  decoys:["see","fee"],  wrongLetters:["s","f"] },
+  { emoji:"🐟", word:"fish", decoys:["dish","wish"],wrongLetters:["d","w"] },
+  { emoji:"🌙", word:"moon", decoys:["boon","soon"],wrongLetters:["b","s"] },
+  { emoji:"🦆", word:"duck", decoys:["luck","tuck"], wrongLetters:["l","t"] },
+  { emoji:"🍎", word:"apple",decoys:["able","ample"],wrongLetters:["b","m"] },
+  { emoji:"🎂", word:"cake", decoys:["bake","lake"],wrongLetters:["b","l"] },
+  { emoji:"🏠", word:"house",decoys:["mouse","louse"],wrongLetters:["m","l"] },
+  { emoji:"⭐", word:"star", decoys:["far","car"],  wrongLetters:["f","c"] },
+  { emoji:"🥁", word:"drum", decoys:["from","trim"], wrongLetters:["f","t"] },
+  { emoji:"🍬", word:"candy",decoys:["handy","sandy"],wrongLetters:["h","s"] },
+  { emoji:"🐮", word:"cow",  decoys:["how","now"],  wrongLetters:["h","n"] },
+  { emoji:"🐷", word:"pig",  decoys:["big","dig"],  wrongLetters:["b","d"] },
+  { emoji:"🦁", word:"lion", decoys:["loon","loin"], wrongLetters:["b","d"] },
+  { emoji:"🍌", word:"banana",decoys:["cabana","manana"],wrongLetters:["c","m"] },
+  { emoji:"🚗", word:"car",  decoys:["bar","jar"],  wrongLetters:["b","j"] },
+  { emoji:"🏀", word:"ball", decoys:["call","fall"], wrongLetters:["c","f"] },
+];
+
+// 4 levels, 8 questions each (pool of 20, shuffled each level)
+const LEVELS = [
+  { name:"Level 1 · First Letter",    mode:"letter", rounds:8 },
+  { name:"Level 2 · Find the Word",   mode:"word",   rounds:8 },
+  { name:"Level 3 · Trace the Letter",mode:"trace-letter", rounds:8 },
+  { name:"Level 4 · Trace the Word",  mode:"trace-word",   rounds:8 },
+];
+
+// ═══════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════
+let deck = [];
+let levelIdx = 0;
+let roundInLevel = 0;
+let score = 0;
+let totalStars = 0;
+let answered = false;
+let traceLetterIdx = 0;   // which letter in the word we're on (level 4)
+let traceLettersDone = []; // booleans for each letter traced
+
+// ═══════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════
+function shuffle(arr) {
+  const a=[...arr];
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+  return a;
+}
+
+function buildDeck() {
+  // use all 20, shuffled, take first `rounds` for this level
+  deck = shuffle(QUESTIONS).slice(0, LEVELS[levelIdx].rounds);
+}
+
+function init() {
+  levelIdx = 0; roundInLevel = 0; score = 0; totalStars = 0;
+  document.getElementById('starsRow').innerHTML = '';
+  document.getElementById('celebrateScreen').classList.remove('visible');
+  document.getElementById('questionArea').style.display = '';
+  buildDeck();
+  updateScoreBar();
+  showQuestion();
+}
+
+function updateScoreBar() {
+  document.getElementById('scoreNum').textContent = score;
+  document.getElementById('roundNum').textContent = roundInLevel + 1;
+  document.getElementById('roundTotal').textContent = LEVELS[levelIdx].rounds;
+}
+
+// ═══════════════════════════════════════════════════════
+//  STARS  (one row per level, 8 stars each)
+// ═══════════════════════════════════════════════════════
+function buildStarRow() {
+  const row = document.getElementById('starsRow');
+  row.innerHTML = '';
+  for (let i = 0; i < LEVELS[levelIdx].rounds; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    s.id = 'star_' + i;
+    s.style.fontSize = '22px';
+    s.textContent = '⭐';
+    row.appendChild(s);
+  }
+}
+
+function earnStar(idx) {
+  const s = document.getElementById('star_' + idx);
+  if (s) { s.classList.add('earned'); }
+}
+
+// ═══════════════════════════════════════════════════════
+//  SHOW QUESTION
+// ═══════════════════════════════════════════════════════
+function showQuestion() {
+  answered = false;
+  const level = LEVELS[levelIdx];
+  const q = deck[roundInLevel];
+
+  document.getElementById('levelBadge').textContent = level.name;
+
+  // emoji
+  const ed = document.getElementById('emojiDisplay');
+  ed.textContent = q.emoji;
+  ed.style.animation = 'none'; void ed.offsetWidth; ed.style.animation = '';
+
+  // feedback / next reset
+  setFeedback('', '');
+  document.getElementById('nextBtn').classList.remove('visible');
+
+  const isTrace = level.mode === 'trace-letter' || level.mode === 'trace-word';
+  // always explicitly set both — never rely on prior state
+  document.getElementById('choicesGrid').style.display = isTrace ? 'none' : 'grid';
+  document.getElementById('traceArea').style.display   = isTrace ? 'flex'  : 'none';
+  document.getElementById('promptText').innerHTML = '';
+
+  if (!isTrace) {
+    showTapQuestion(q, level.mode);
+  } else if (level.mode === 'trace-letter') {
+    showTraceLetter(q);
+  } else {
+    showTraceWord(q);
+  }
+
+  updateScoreBar();
+}
+
+// ── tap levels ──────────────────────────────────────────
+function showTapQuestion(q, mode) {
+  const prompt = document.getElementById('promptText');
+  if (mode === 'letter') {
+    prompt.innerHTML = `What letter does <span class="hl">${q.emoji}</span> start with?`;
+  } else {
+    prompt.innerHTML = `Which word matches <span class="hl">${q.emoji}</span>?`;
+  }
+
+  const grid = document.getElementById('choicesGrid');
+  grid.innerHTML = '';
+  let choices = mode === 'letter'
+    ? shuffle([q.word[0], ...q.wrongLetters])
+    : shuffle([q.word, ...q.decoys]);
+
+  choices.forEach(ch => {
+    const btn = document.createElement('button');
+    btn.className = 'choice-btn';
+    btn.textContent = ch;
+    btn.onclick = () => handleTapAnswer(btn, ch, mode, q);
+    grid.appendChild(btn);
+  });
+}
+
+function handleTapAnswer(btn, choice, mode, q) {
+  if (answered) return;
+  answered = true;
+  const correct = mode === 'letter' ? q.word[0] : q.word;
+  const ok = choice === correct;
+  btn.classList.add(ok ? 'correct' : 'wrong');
+  if (!ok) {
+    document.querySelectorAll('.choice-btn').forEach(b => {
+      if (b.textContent === correct) b.classList.add('correct');
+    });
+  }
+  resolveAnswer(ok);
+}
+
+// ═══════════════════════════════════════════════════════
+//  LEVEL 3 — trace single letter
+// ═══════════════════════════════════════════════════════
+function showTraceLetter(q) {
+  const letter = q.word[0].toUpperCase();
+  document.getElementById('promptText').innerHTML =
+    `Trace the letter <span class="hl">${letter}</span> for <span class="hl">${q.emoji}</span>`;
+  document.getElementById('traceInstruction').textContent =
+    'Draw over the dotted letter with your finger!';
+  document.getElementById('letterNav').style.display = 'none';
+  document.getElementById('traceArea').querySelector('.trace-btns').style.display = 'flex';
+  setupCanvases(letter);
+}
+
+// ═══════════════════════════════════════════════════════
+//  LEVEL 4 — trace each letter of the whole word
+// ═══════════════════════════════════════════════════════
+function showTraceWord(q) {
+  traceLetterIdx = 0;
+  traceLettersDone = Array(q.word.length).fill(false);
+  document.getElementById('promptText').innerHTML =
+    `Trace each letter of <span class="hl">${q.emoji} ${q.word}</span>`;
+  buildLetterNav(q.word);
+  showCurrentLetter(q.word);
+}
+
+function buildLetterNav(word) {
+  const nav = document.getElementById('letterNav');
+  nav.style.display = 'flex';
+  nav.innerHTML = '';
+  for (let i = 0; i < word.length; i++) {
+    const pip = document.createElement('div');
+    pip.className = 'letter-pip' + (i === 0 ? ' current' : '');
+    pip.id = 'pip_' + i;
+    pip.textContent = word[i].toUpperCase();
+    nav.appendChild(pip);
+  }
+}
+
+function showCurrentLetter(word) {
+  const letter = word[traceLetterIdx].toUpperCase();
+  document.getElementById('traceInstruction').textContent =
+    `Trace the letter "${letter}" (${traceLetterIdx + 1} of ${word.length})`;
+  setupCanvases(letter);
+  setFeedback('', '');
+  document.getElementById('nextBtn').classList.remove('visible');
+  document.getElementById('traceArea').querySelector('.trace-btns').style.display = 'flex';
+}
+
+function updateLetterPips(word) {
+  for (let i = 0; i < word.length; i++) {
+    const pip = document.getElementById('pip_' + i);
+    if (!pip) continue;
+    pip.className = 'letter-pip' +
+      (traceLettersDone[i] ? ' done' :
+       i === traceLetterIdx  ? ' current' : '');
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  TRACING — shared canvas setup
+// ═══════════════════════════════════════════════════════
+let drawCtx = null;
+let guideCtx = null;
+let hitCtx  = null;
+let isDrawing = false;
+let lastX = 0, lastY = 0;
+let strokeColor = 0; // hue rotation for rainbow
+let strokeLength = 0;  // total px drawn this attempt
+
+const CANVAS_SIZE = Math.min(window.innerWidth * 0.78, 320);
+const RAINBOW_COLORS = ['#FF5B8B','#FF8C42','#FFD23F','#43D68F','#4BAEE8','#9B6DFF'];
+
+function setupCanvases(label) {
+  const wrap   = document.getElementById('canvasWrap');
+  const guide  = document.getElementById('guideCanvas');
+  const draw   = document.getElementById('drawCanvas');
+  const isWord = label.length > 1;
+  const W = isWord ? Math.min(window.innerWidth * 0.84, 400) : CANVAS_SIZE;
+  const H = isWord ? Math.min(W * 0.45, 170) : CANVAS_SIZE;
+
+  [guide, draw].forEach(c => { c.width = W; c.height = H; });
+  wrap.style.width  = W + 'px';
+  wrap.style.height = H + 'px';
+
+  guideCtx = guide.getContext('2d');
+  drawCtx  = draw.getContext('2d');
+  drawCtx.lineCap = 'round';
+  drawCtx.lineJoin = 'round';
+  drawCtx.lineWidth = isWord ? 14 : 20;
+
+  // init hitCtx BEFORE renderGuide so the hit mask render inside it works
+  const hit = document.getElementById('hitCanvas');
+  hit.width = W; hit.height = H;
+  hitCtx = hit.getContext('2d');
+
+  renderGuide(guide, guideCtx, label, W, H);
+
+  // render fully opaque version on hit canvas — use same font object already loaded
+  // by waiting a frame so the visible guide canvas has already measured the font
+  // hit canvas built synchronously inside renderGuide — nothing to do here
+
+  drawCtx.clearRect(0, 0, W, H);
+  strokeColor = 0;
+  strokeLength = 0;
+
+  // events
+  draw.onpointerdown = startDraw;
+  draw.onpointermove = doDraw;
+  draw.onpointerup   = endDraw;
+  draw.onpointerleave= endDraw;
+}
+
+function buildHitMaskFromGuide(hitCanvas, hCtx, guideCanvas, gCtx, W, H) {
+  // Build hit mask as solid filled letter body — this is what Ana colors in.
+  // We re-render to hitCanvas with full opacity so every interior pixel registers.
+  // Font is already loaded because guideCanvas just rendered it successfully.
+  hCtx.clearRect(0, 0, W, H);
+  const isWord = hitCanvas._label && hitCanvas._label.length > 1;
+  const label  = hitCanvas._label || '';
+  const fontSize = isWord
+    ? Math.min(H * 0.75, W / (label.length * 0.7))
+    : Math.min(W * 0.75, H * 0.75);
+
+  hCtx.font = `900 ${fontSize}px Nunito, sans-serif`;
+  hCtx.textAlign = 'center';
+  hCtx.textBaseline = 'middle';
+
+  // Stroke only — no fill. This matches how Ana actually draws:
+  // she traces/colors the letter body, not the hollow interior of curved letters.
+  // Thick stroke means C, U, O get wide bands; thin letters like I, L also get body.
+  hCtx.lineWidth = isWord ? 32 : 44;
+  hCtx.lineJoin = 'round';
+  hCtx.lineCap  = 'round';
+  hCtx.strokeStyle = '#000000';
+  hCtx.strokeText(label, W / 2, H / 2);
+}
+
+function renderGuide(canvas, ctx, label, W, H) {
+  ctx.clearRect(0, 0, W, H);
+
+  const isWord = label.length > 1;
+  const fontSize = isWord
+    ? Math.min(H * 0.75, W / (label.length * 0.7))
+    : Math.min(W * 0.75, H * 0.75);
+
+  // Use exact same font string for both visible guide and hit mask
+  const fontStr = `900 ${fontSize}px Nunito, sans-serif`;
+  ctx.font = fontStr;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // thick stroke guide — visible layer
+  ctx.save();
+  ctx.lineWidth = isWord ? 18 : 24;
+  ctx.strokeStyle = 'rgba(155,109,255,0.20)';
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.setLineDash([]);
+  ctx.strokeText(label, W / 2, H / 2);
+  ctx.restore();
+
+  // dotted outline on top
+  ctx.save();
+  ctx.setLineDash([6, 8]);
+  ctx.lineWidth = isWord ? 3 : 4;
+  ctx.strokeStyle = 'rgba(155,109,255,0.60)';
+  ctx.strokeText(label, W / 2, H / 2);
+  ctx.restore();
+
+  // start-here dot
+  ctx.fillStyle = 'rgba(75,174,232,0.6)';
+  ctx.beginPath();
+  ctx.arc(W * (isWord ? 0.08 : 0.22), H * 0.22, isWord ? 7 : 10, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ── Build hit mask synchronously right now ──────────────
+  // Font is loaded and set — render opaque thick stroke into hitCanvas
+  // using identical font string and position. This is the only reliable way.
+  const hit = document.getElementById('hitCanvas');
+  if (hit && hitCtx) {
+    hit.width = W; hit.height = H;
+    hit._label = label;
+    hitCtx.clearRect(0, 0, W, H);
+    hitCtx.font = fontStr;          // same string, guaranteed loaded
+    hitCtx.textAlign = 'center';
+    hitCtx.textBaseline = 'middle';
+    hitCtx.lineWidth = isWord ? 40 : 56;  // very thick — finger has width
+    hitCtx.lineJoin = 'round';
+    hitCtx.lineCap  = 'round';
+    hitCtx.strokeStyle = '#000000';
+    hitCtx.strokeText(label, W / 2, H / 2);
+  }
+}
+
+// ── drawing handlers ────────────────────────────────────
+function getPos(e) {
+  const rect = e.target.getBoundingClientRect();
+  return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
+function startDraw(e) {
+  e.preventDefault();
+  isDrawing = true;
+  const p = getPos(e);
+  lastX = p.x; lastY = p.y;
+  strokeColor = (strokeColor + 1) % RAINBOW_COLORS.length;
+}
+
+function doDraw(e) {
+  if (!isDrawing) return;
+  e.preventDefault();
+  const p = getPos(e);
+  drawCtx.beginPath();
+  drawCtx.moveTo(lastX, lastY);
+  drawCtx.lineTo(p.x, p.y);
+  drawCtx.strokeStyle = RAINBOW_COLORS[strokeColor];
+  drawCtx.stroke();
+  const dx = p.x - lastX, dy = p.y - lastY;
+  strokeLength += Math.sqrt(dx*dx + dy*dy);
+  lastX = p.x; lastY = p.y;
+  strokeColor = (strokeColor + 1) % RAINBOW_COLORS.length;
+}
+
+function endDraw(e) { isDrawing = false; }
+
+function clearDraw() {
+  const draw = document.getElementById('drawCanvas');
+  drawCtx.clearRect(0, 0, draw.width, draw.height);
+  strokeLength = 0;
+}
+
+// ── Zone definitions per letter ──────────────────────────
+// Each zone is {x0,y0,x1,y1} as fractions of canvas W/H.
+// A letter passes if she draws in ALL of its required zones.
+// Zones are generous — they just need at least one drawn pixel inside.
+const LETTER_ZONES = {
+  // single-stroke letters: one zone covering the whole letter area
+  'C': [{x0:.15,y0:.05,x1:.85,y1:.95}],
+  'O': [{x0:.15,y0:.05,x1:.85,y1:.95}],
+  'U': [{x0:.15,y0:.05,x1:.85,y1:.95}],
+  'S': [{x0:.15,y0:.05,x1:.85,y1:.95}],
+  'J': [{x0:.15,y0:.05,x1:.85,y1:.95}],
+  'G': [{x0:.15,y0:.05,x1:.85,y1:.95}],
+  'I': [{x0:.15,y0:.05,x1:.85,y1:.95}],
+  'L': [{x0:.15,y0:.05,x1:.85,y1:.95}],
+  'V': [{x0:.15,y0:.05,x1:.85,y1:.95}],
+  'W': [{x0:.05,y0:.05,x1:.95,y1:.95}],
+  // two-stroke letters: two zones
+  'N': [{x0:.10,y0:.05,x1:.50,y1:.95},{x0:.50,y0:.05,x1:.90,y1:.95}],
+  'M': [{x0:.05,y0:.05,x1:.50,y1:.95},{x0:.50,y0:.05,x1:.95,y1:.95}],
+  'Z': [{x0:.10,y0:.05,x1:.90,y1:.50},{x0:.10,y0:.50,x1:.90,y1:.95}],
+  'X': [{x0:.10,y0:.05,x1:.50,y1:.95},{x0:.50,y0:.05,x1:.90,y1:.95}],
+  'K': [{x0:.10,y0:.05,x1:.50,y1:.95},{x0:.50,y0:.05,x1:.90,y1:.95}],
+  'Y': [{x0:.10,y0:.05,x1:.90,y1:.50},{x0:.35,y0:.50,x1:.65,y1:.95}],
+  'T': [{x0:.05,y0:.05,x1:.95,y1:.40},{x0:.35,y0:.40,x1:.65,y1:.95}],
+  'D': [{x0:.10,y0:.05,x1:.50,y1:.95},{x0:.50,y0:.05,x1:.90,y1:.95}],
+  'P': [{x0:.10,y0:.05,x1:.50,y1:.95},{x0:.50,y0:.05,x1:.90,y1:.55}],
+  'A': [{x0:.05,y0:.05,x1:.50,y1:.95},{x0:.50,y0:.05,x1:.95,y1:.95}],
+  'Q': [{x0:.10,y0:.05,x1:.90,y1:.95},{x0:.55,y0:.55,x1:.95,y1:.95}],
+  // three-stroke letters: three zones — must hit all three
+  'H': [{x0:.05,y0:.05,x1:.38,y1:.95},{x0:.28,y0:.38,x1:.72,y1:.62},{x0:.62,y0:.05,x1:.95,y1:.95}],
+  'E': [{x0:.10,y0:.55,x1:.45,y1:.95},{x0:.10,y0:.05,x1:.90,y1:.30},{x0:.10,y0:.38,x1:.85,y1:.58}],
+  'F': [{x0:.10,y0:.55,x1:.45,y1:.95},{x0:.10,y0:.05,x1:.90,y1:.30},{x0:.10,y0:.38,x1:.80,y1:.58}],
+  'B': [{x0:.10,y0:.05,x1:.50,y1:.95},{x0:.50,y0:.05,x1:.90,y1:.50},{x0:.50,y0:.50,x1:.90,y1:.95}],
+  'R': [{x0:.10,y0:.05,x1:.50,y1:.95},{x0:.50,y0:.05,x1:.90,y1:.55},{x0:.50,y0:.55,x1:.90,y1:.95}],
+};
+const MIN_ZONE_PIXELS = 25; // at least this many drawn pixels must be in a zone
+
+function coverageScore() {
+  const draw = document.getElementById('drawCanvas');
+  const W = draw.width, H = draw.height;
+  const dData = drawCtx.getImageData(0, 0, W, H).data;
+
+  // Precision: what fraction of drawn pixels overlap the hit mask
+  const hit = document.getElementById('hitCanvas');
+  let hitPx=0, drawPx=0, overlap=0;
+  if (hitCtx && hit.width) {
+    const hData = hitCtx.getImageData(0, 0, W, H).data;
+    for (let i=0; i<W*H; i++) {
+      if (hData[i*4+3]>20) hitPx++;
+      if (dData[i*4+3]>20) { drawPx++; if(hData[i*4+3]>20) overlap++; }
+    }
+  }
+  const precision = drawPx>0 ? overlap/drawPx : 0;
+
+  // Zone check: count drawn pixels in each required zone for this letter
+  const label = (hit._label||'').toUpperCase();
+  const zones = LETTER_ZONES[label] || [{x0:.10,y0:.05,x1:.90,y1:.95}];
+  const zoneCounts = zones.map(()=>0);
+  for (let y=0; y<H; y++) {
+    for (let x=0; x<W; x++) {
+      if (dData[(y*W+x)*4+3]>20) {
+        const fx=x/W, fy=y/H;
+        zones.forEach((z,i)=>{
+          if (fx>=z.x0&&fx<=z.x1&&fy>=z.y0&&fy<=z.y1) zoneCounts[i]++;
+        });
+      }
+    }
+  }
+  const allZonesMet = zoneCounts.every(c=>c>=MIN_ZONE_PIXELS);
+
+  return { precision, allZonesMet, drawPx };
+}
+
+
+// ═══════════════════════════════════════════════════════
+//  CHECK TRACE
+// ═══════════════════════════════════════════════════════
+function checkTrace() {
+  if (answered) return;
+
+  const drawEl = document.getElementById('drawCanvas');
+  if (strokeLength < drawEl.width * 0.15) {
+    setFeedback("Try drawing more of the letter! 💜","bad"); return;
+  }
+  if (strokeLength > drawEl.width * 3) {
+    setFeedback("Too many lines! Try tracing just the letter. 💜","bad"); return;
+  }
+
+  const result = coverageScore();
+  if (result.precision === 0) { setFeedback("Try drawing on the letter! 💜","bad"); return; }
+  // precision: 60% of her drawing must overlap the letter path
+  // coverage:  35% of the letter path must be painted (catches missing strokes)
+  // Precision: 65% of her drawing must land on the letter hit mask
+  // Zones: she must draw in every required zone for this letter (catches missing strokes)
+  // Always encourage — tracing practice is the goal, not grading perfection.
+  // Give a star for any genuine attempt (enough stroke length already verified above).
+  const level = LEVELS[levelIdx];
+  const cheers = ['Great tracing, Ana! 🌟','You did it! 🦄','Keep it up, Ana! 🌈','Nice work! ⭐','You traced it! 🎉','Wonderful, Ana! 🌸'];
+  const cheer = cheers[Math.floor(Math.random()*cheers.length)];
+
+  if (level.mode === 'trace-letter') {
+    answered = true;
+    setFeedback(cheer, 'good');
+    score++;
+    earnStar(roundInLevel);
+    speak(cheer.replace(/[^\w\s!,]/g,''));
+    document.getElementById('nextBtn').classList.add('visible');
+    const traceBtns = document.getElementById('traceArea').querySelector('.trace-btns');
+    if (traceBtns) traceBtns.style.display = 'none';
+    updateScoreBar();
+  } else {
+    const q = deck[roundInLevel];
+    traceLettersDone[traceLetterIdx] = true;
+    speak(cheer.replace(/[^\w\s!,]/g,''));
+    traceLetterIdx++;
+    updateLetterPips(q.word);
+    if (traceLetterIdx >= q.word.length) {
+      answered = true;
+      resolveAnswer(true);
+    } else {
+      setFeedback(cheer, 'good');
+      showCurrentLetter(q.word);
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  RESOLVE ANSWER (shared)
+// ═══════════════════════════════════════════════════════
+function resolveAnswer(ok) {
+  if (ok) {
+    const cheers = [
+      "Great job, Ana! 🌟", "Yes! 🦄", "You got it! 🌈",
+      "Wonderful, Ana! ⭐", "Amazing! 🎉", "Brilliant! 🌸",
+      "That's right, Ana! 💜", "You're so smart! 🌟",
+      "Perfect! 🦄", "Way to go, Ana! 🌈",
+      "You're a star! ⭐", "Awesome, Ana! 🎀",
+      "Yes, yes, yes! 🎉", "You did it! 🌸",
+      "So good, Ana! 💛", "Look at you go! 🦄"
+    ];
+    const msg = cheers[Math.floor(Math.random()*cheers.length)];
+    setFeedback(msg, 'good');
+    score++;
+    earnStar(roundInLevel);
+    speak(msg.replace(/[^\w\s!,]/g,''));
+  } else {
+    const miss = [
+      "Almost, Ana! Try again! 💜",
+      "So close! 💙",
+      "Not quite — you can do it! 💛",
+      "Keep trying, Ana! 🌈",
+      "Good try! 💜",
+      "Nearly there, Ana! ⭐",
+      "Oops! Let's keep going! 💙",
+      "Don't give up, Ana! 🦄"
+    ];
+    setFeedback(miss[Math.floor(Math.random()*miss.length)], 'bad');
+  }
+  document.getElementById('nextBtn').classList.add('visible');
+  const traceBtns = document.getElementById('traceArea').querySelector('.trace-btns');
+  if (traceBtns) traceBtns.style.display = 'none';
+  updateScoreBar();
+}
+
+function setFeedback(text, type) {
+  const fb = document.getElementById('feedbackText');
+  fb.textContent = text;
+  fb.className = 'feedback' + (type === 'good' ? ' show-good' : type === 'bad' ? ' show-bad' : '');
+}
+
+// ═══════════════════════════════════════════════════════
+//  NEXT
+// ═══════════════════════════════════════════════════════
+function nextQuestion() {
+  roundInLevel++;
+  if (roundInLevel >= LEVELS[levelIdx].rounds) {
+    levelIdx++;
+    roundInLevel = 0;
+    if (levelIdx >= LEVELS.length) { showCelebrate(); return; }
+    buildDeck();
+    buildStarRow();
+    updateScoreBar();
+  }
+  document.getElementById('choicesGrid').style.display = 'grid';
+  document.getElementById('traceArea').style.display   = 'none';
+  showQuestion();
+}
+
+// ═══════════════════════════════════════════════════════
+//  CELEBRATE
+// ═══════════════════════════════════════════════════════
+function showCelebrate() {
+  document.getElementById('questionArea').style.display = 'none';
+  document.getElementById('celebrateScreen').classList.add('visible');
+  const total = LEVELS.reduce((s,l)=>s+l.rounds,0);
+  const pct = Math.round((score / total)*100);
+  let emoji='🌈', title='You finished!', sub='';
+  if (pct===100) {
+    emoji='🦄✨'; title='Perfect score!';
+    sub=`${score} out of ${total} — Ana is a Rainbow Reader! 🌈`;
+    launchConfetti();
+  } else if (pct>=75) {
+    emoji='⭐🌸'; title='Awesome work!';
+    sub=`${score} out of ${total} — Ana keeps shining! ⭐`;
+    launchConfetti(30);
+  } else {
+    emoji='💜🌟'; title='Good trying!';
+    sub=`${score} out of ${total} — Keep practicing, Ana! 🦄`;
+  }
+  document.getElementById('celebrateEmoji').textContent = emoji;
+  document.getElementById('celebrateTitle').textContent = title;
+  document.getElementById('celebrateSub').textContent   = sub;
+  speak(`Great work Ana! You got ${score} out of ${total}!`);
+}
+
+function launchConfetti(count=70) {
+  const wrap = document.getElementById('confettiWrap');
+  wrap.innerHTML='';
+  const colors=['#FF5B8B','#FF8C42','#FFD23F','#43D68F','#4BAEE8','#9B6DFF'];
+  for(let i=0;i<count;i++){
+    const p=document.createElement('div');
+    p.className='confetti-piece';
+    p.style.left=Math.random()*100+'vw';
+    p.style.background=colors[Math.floor(Math.random()*colors.length)];
+    p.style.animationDuration=(1.5+Math.random()*2)+'s';
+    p.style.animationDelay=(Math.random()*.8)+'s';
+    const sz=8+Math.random()*8;
+    p.style.width=sz+'px'; p.style.height=sz+'px';
+    p.style.borderRadius=Math.random()>.5?'50%':'2px';
+    wrap.appendChild(p);
+    setTimeout(()=>p.remove(),4000);
+  }
+}
+
+function restart() { init(); }
+
+// ═══════════════════════════════════════════════════════
+//  VOICE
+// ═══════════════════════════════════════════════════════
+function speak(text) {
+  if (!window.speechSynthesis) return;
+  const u = new SpeechSynthesisUtterance(text.replace(/[^\w\s!,]/g,''));
+  u.rate = 0.85; u.pitch = 1.25;
+  const trySpeak = () => {
+    const voices = speechSynthesis.getVoices();
+    const femaleNames = ["Samantha","Karen","Moira","Tessa","Fiona","Veena",
+                         "Victoria","Allison","Ava","Susan","Zira","Jenny",
+                         "Aria","Michelle","Monica","Google UK English Female",
+                         "Google US English"];
+    let chosen = null;
+    for (const name of femaleNames) {
+      chosen = voices.find(v => v.name === name);
+      if (chosen) break;
+    }
+    if (!chosen) {
+      chosen = voices.find(v => /female|woman|girl/i.test(v.name)) ||
+               voices.find(v => v.lang.startsWith('en')) || voices[0];
+    }
+    if (chosen) u.voice = chosen;
+    speechSynthesis.speak(u);
+  };
+  if (speechSynthesis.getVoices().length) trySpeak();
+  else speechSynthesis.onvoiceschanged = trySpeak;
+}
+
+// ═══════════════════════════════════════════════════════
+//  START
+// ═══════════════════════════════════════════════════════
+buildStarRow();
+init();
+</script>
+</body>
+</html>
